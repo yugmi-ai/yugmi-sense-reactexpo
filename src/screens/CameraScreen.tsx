@@ -17,6 +17,7 @@ import * as Location from 'expo-location';
 import { saveToLibrary } from '../lib/mediaLibrary';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, queryKeys } from '../lib/api';
+import { useAuth } from '../lib/authContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,6 +28,7 @@ const CameraScreen = () => {
   const route = useRoute();
   const queryClient = useQueryClient();
   const cameraRef = useRef<CameraView>(null);
+  const { user } = useAuth();
   
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('back');
@@ -140,6 +142,8 @@ const CameraScreen = () => {
           latitude: location?.coords.latitude,
           longitude: location?.coords.longitude,
           locationAddress: address,
+          locationName: address.split(' ')[0] || 'Unknown',
+          userId: user?.id
         });
       } catch (error) {
         setIsUploading(false);
@@ -186,6 +190,8 @@ const CameraScreen = () => {
             latitude: location?.coords.latitude,
             longitude: location?.coords.longitude,
             locationAddress: address,
+            locationName: address.split(' ')[0] || 'Unknown',
+            userId: user?.id
           });
         }
       } catch (error) {

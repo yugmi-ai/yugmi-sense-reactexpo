@@ -4,7 +4,7 @@
     "slug": "yugmi-inspector",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/yugmi.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "splash": {

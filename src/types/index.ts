@@ -1,10 +1,38 @@
 // Types for YugmiInspector React Native App
-import { z } from 'zod';
 
 // Base types
 export interface User {
   id: number;
   username: string;
+  email: string;
+  fullName?: string;
+  role?: string;
+  createdAt: string;
+}
+
+// Authentication types
+export interface AuthCredentials {
+  email: string;
+  password: string;
+}
+
+export interface SignupData {
+  email: string;
+  password: string;
+  fullName: string;
+  confirmPassword: string;
+}
+
+export interface AuthResponse {
+  user: User;
+  token: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 export interface MediaItem {
@@ -103,8 +131,13 @@ export interface LocationData {
 
 // Navigation types
 export type RootStackParamList = {
+  Auth: undefined;
   Main: undefined;
   MediaDetail: { id: number };
+  Profile: undefined;
+  Login: undefined;
+  Signup: undefined;
+  ForgotPassword: undefined;
 };
 
 export type MainTabParamList = {
@@ -112,6 +145,7 @@ export type MainTabParamList = {
   Camera: { mode?: 'photo' | 'video' } | undefined;
   Gallery: undefined;
   Reports: undefined;
+  Profile: undefined;
   MediaDetail: { id: number };
 };
 
@@ -122,6 +156,7 @@ export interface MediaUploadData {
   longitude?: number;
   locationName?: string;
   locationAddress?: string;
+  userId?: number;
 }
 
 // Error types

@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { apiClient, queryKeys } from '../lib/api';
 import { MediaWithAnalysis } from '../types';
+import { useAuth } from '../lib/authContext';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +24,7 @@ type DashboardScreenNavigationProp = BottomTabNavigationProp<MainTabParamList, '
 
 const DashboardScreen = () => {
   const navigation = useNavigation<DashboardScreenNavigationProp>();
+  const { user } = useAuth();
   const [location, setLocation] = React.useState<Location.LocationObject | null>(null);
   const [address, setAddress] = React.useState<string>('Getting location...');
 
@@ -131,14 +133,21 @@ const DashboardScreen = () => {
         </View>
         <View style={styles.statusRight}>
           <View style={styles.onlineIndicator} />
-          <Ionicons name="grid-outline" size={16} color="white" />
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <Ionicons name="person-circle-outline" size={24} color="white" />
+          </TouchableOpacity>
         </View>
       </View>
 
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Yugmi Sense</Text>
-        <Text style={styles.subtitle}>Field Inspection Dashboard</Text>
+        <Text style={styles.subtitle}>
+          {user?.fullName ? `Welcome, ${user.fullName}` : 'Field Inspection Dashboard'}
+        </Text>
         
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
@@ -291,6 +300,9 @@ const styles = StyleSheet.create({
   statusRight: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  profileButton: {
+    padding: 4,
   },
   statusText: {
     color: 'white',
