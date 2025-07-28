@@ -1,14 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  sendPasswordResetEmail,
   onAuthStateChanged,
   User as FirebaseUser
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import { firebaseService } from './firebaseService';
 import { AuthState, User, AuthCredentials, SignupData } from '../types';
 
 // Default auth state
@@ -83,108 +80,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Login function
   const login = async (credentials: AuthCredentials) => {
     try {
-      // Sign in with Firebase
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        credentials.email,
-        credentials.password
-      );
-      
+      const response = await firebaseService.login(credentials);
       // Auth state will be updated by the onAuthStateChanged listener
-      return userCredential.user;
+      return response.user;
     } catch (error: any) {
       console.error('Login error:', error);
-      
-      // Provide more user-friendly error messages
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        throw new Error('Invalid email or password');
-      } else if (error.code === 'auth/too-many-requests') {
-        throw new Error('Too many failed login attempts. Please try again later');
-      } else {
-        throw new Error(error.message || 'Failed to login');
-      }
+      throw error;
     }
   };
 
   // Signup function
   const signup = async (userData: SignupData) => {
     try {
-      // Validate password match
-      if (userData.password !== userData.confirmPassword) {
-        throw new Error('Passwords do not match');
-      }
-      
-      // Create user with Firebase
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        userData.email,
-        userData.password
-      );
-      
-      const firebaseUser = userCredential.user;
-      
-      try {
-        // Save additional user data to Firestore
-        await setDoc(doc(db, 'users', firebaseUser.uid), {
-          username: userData.email.split('@')[0],
-          email: userData.email,
-          fullName: userData.fullName,
-          role: 'user',
-          createdAt: new Date().toISOString(),
-        });
-      } catch (firestoreError) {
-        // If Firestore save fails, we still continue since the user is created in Firebase Auth
-        console.error('Error saving user data to Firestore:', firestoreError);
-      }
-      
+      const response = await firebaseService.signup(userData);
       // Auth state will be updated by the onAuthStateChanged listener
-      return firebaseUser;
+      return response.user;
     } catch (error: any) {
       console.error('Signup error:', error);
-      
-      // Provide more user-friendly error messages
-      if (error.code === 'auth/email-already-in-use') {
-        throw new Error('Email is already in use');
-      } else if (error.code === 'auth/weak-password') {
-        throw new Error('Password is too weak');
-      } else if (error.code === 'auth/invalid-email') {
-        throw new Error('Invalid email address');
-      } else if (error.code === 'auth/operation-not-allowed') {
-        throw new Error('Email/password accounts are not enabled');
-      } else {
-        throw new Error('Failed to create account. Please try again later.');
-      }
+      throw error;
     }
   };
 
   // Logout function
   const logout = async () => {
     try {
-      // Sign out from Firebase
-      await signOut(auth);
-      
+      await firebaseService.logout();
       // Auth state will be updated by the onAuthStateChanged listener
     } catch (error: any) {
       console.error('Logout error:', error);
-      throw new Error(error.message || 'Failed to logout');
+      throw error;
     }
   };
 
   // Forgot password function
   const forgotPassword = async (email: string) => {
     try {
-      // Send password reset email with Firebase
-      await sendPasswordResetEmail(auth, email);
-      return { message: 'Password reset email sent successfully' };
+      return await firebaseService.forgotPassword(email);
     } catch (error: any) {
       console.error('Forgot password error:', error);
-      
-      // Provide more user-friendly error messages
-      if (error.code === 'auth/user-not-found') {
-        throw new Error('No account found with this email');
-      } else {
-        throw new Error(error.message || 'Failed to send reset email');
-      }
+      throw error;
     }
   };
 

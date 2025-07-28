@@ -1,0 +1,25 @@
+[debug] [2025-07-25T11:41:17.064Z] ----------------------------------------------------------------------
+[debug] [2025-07-25T11:41:17.066Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init storage
+[debug] [2025-07-25T11:41:17.066Z] CLI Version:   14.11.1
+[debug] [2025-07-25T11:41:17.066Z] Platform:      win32
+[debug] [2025-07-25T11:41:17.066Z] Node Version:  v22.17.1
+[debug] [2025-07-25T11:41:17.066Z] Time:          Fri Jul 25 2025 17:11:17 GMT+0530 (India Standard Time)
+[debug] [2025-07-25T11:41:17.066Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-07-25T11:41:17.164Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-07-25T11:41:17.165Z] > authorizing via signed-in user (yugmi.ai@gmail.com)
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  D:\Node Backend Yugmi\yugmi-sense-reactexpo
+
+Before we get started, keep in mind:
+
+  * You are initializing within an existing Firebase project directory
+

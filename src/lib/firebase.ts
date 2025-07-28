@@ -1,9 +1,10 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuth, connectAuthEmulator, initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator, enableNetwork, disableNetwork } from 'firebase/firestore';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -19,8 +20,10 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Auth
-const auth = getAuth(app);
+// Initialize Firebase Auth with persistence
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage)
+});
 
 // Initialize Firestore
 const db = getFirestore(app);
@@ -28,19 +31,44 @@ const db = getFirestore(app);
 // Initialize Firebase Storage
 const storage = getStorage(app);
 
+// Initialize Firebase Functions
+const functions = getFunctions(app);
+
+// Development emulator connections (uncomment for local testing)
+// if (__DEV__) {
+//   connectAuthEmulator(auth, 'http://localhost:9099');
+//   connectFirestoreEmulator(db, 'localhost', 8080);
+//   connectStorageEmulator(storage, 'localhost', 9199);
+//   connectFunctionsEmulator(functions, 'localhost', 5001);
+// }
+
 // Firebase collection names
 export const collections = {
     users: 'users',
     media: 'media',
     reports: 'reports',
     analysis: 'analysis',
-    stats: 'stats'
+    stats: 'stats',
+    inspections: 'inspections',
+    projects: 'projects',
+    locations: 'locations'
 };
 
 // Firebase storage paths
 export const storagePaths = {
     media: 'media',
-    thumbnails: 'thumbnails'
+    thumbnails: 'thumbnails',
+    reports: 'reports',
+    exports: 'exports'
 };
 
-export { app, auth, db, storage };
+// Firebase utilities
+export const enableOfflineCapability = () => {
+  return enableNetwork(db);
+};
+
+export const disableOfflineCapability = () => {
+  return disableNetwork(db);
+};
+
+export { app, auth, db, storage, functions };
