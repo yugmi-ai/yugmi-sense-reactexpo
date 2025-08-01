@@ -11,18 +11,29 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useQuery } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MainTabParamList } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { apiClient, queryKeys } from '../lib/api';
 import { MediaWithAnalysis } from '../types';
+import { useAuth } from '../lib/authContext';
+import { useTheme } from '@crossbuildui/core';
+import type { ThemeColors } from '@crossbuildui/core';
+import { Avatar } from '../crossbuildui/avatar';
 
 const { width } = Dimensions.get('window');
 
 type DashboardScreenNavigationProp = BottomTabNavigationProp<MainTabParamList, 'Dashboard'>;
 
 const DashboardScreen = () => {
+  // Get the safe area insets for padding
+  const insets = useSafeAreaInsets();
+
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const navigation = useNavigation<DashboardScreenNavigationProp>();
+  const { user } = useAuth();
   const [location, setLocation] = React.useState<Location.LocationObject | null>(null);
   const [address, setAddress] = React.useState<string>('Getting location...');
 
@@ -31,10 +42,10 @@ const DashboardScreen = () => {
     queryFn: () => apiClient.getStats(),
   });
 
-  const { 
-    data: mediaData, 
-    isLoading: mediaLoading, 
-    refetch: refetchMedia 
+  const {
+    data: mediaData,
+    isLoading: mediaLoading,
+    refetch: refetchMedia
   } = useQuery({
     queryKey: queryKeys.media,
     queryFn: () => apiClient.getMedia(1, 10),
@@ -112,15 +123,34 @@ const DashboardScreen = () => {
   };
 
   return (
-    <ScrollView 
-      style={styles.container}
+    <ScrollView
+      style={[styles.container, { paddingTop: insets.top }]}
       refreshControl={
-        <RefreshControl 
-          refreshing={statsLoading || mediaLoading} 
+        <RefreshControl
+          refreshing={statsLoading || mediaLoading}
           onRefresh={onRefresh}
         />
       }
     >
+
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>Yugmi Sense</Text>
+          <Text style={styles.subtitle}>
+            {user?.fullName ? `Welcome, ${user.fullName}` : 'Field Inspection Dashboard'}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Profile')}
+        >
+          <Avatar
+            size='md'
+            name={user?.fullName || 'User'}
+          />
+        </TouchableOpacity>
+      </View>
+
       {/* Status Bar */}
       <View style={styles.statusBar}>
         <View style={styles.statusLeft}>
@@ -131,35 +161,28 @@ const DashboardScreen = () => {
         </View>
         <View style={styles.statusRight}>
           <View style={styles.onlineIndicator} />
-          <Ionicons name="grid-outline" size={16} color="white" />
         </View>
       </View>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Yugmi Sense</Text>
-        <Text style={styles.subtitle}>Field Inspection Dashboard</Text>
-        
-        {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          <View style={[styles.statCard, { backgroundColor: '#DBEAFE' }]}>
-            <Text style={[styles.statValue, { color: '#1D4ED8' }]}>
-              {statsLoading ? '...' : stats?.imagesCount || 0}
-            </Text>
-            <Text style={styles.statLabel}>Images</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: '#D1FAE5' }]}>
-            <Text style={[styles.statValue, { color: '#059669' }]}>
-              {statsLoading ? '...' : stats?.videosCount || 0}
-            </Text>
-            <Text style={styles.statLabel}>Videos</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: '#FED7AA' }]}>
-            <Text style={[styles.statValue, { color: '#EA580C' }]}>
-              {statsLoading ? '...' : stats?.issuesCount || 0}
-            </Text>
-            <Text style={styles.statLabel}>Issues</Text>
-          </View>
+      {/* Stats Grid */}
+      <View style={styles.statsGrid}>
+        <View style={[styles.statCard, { backgroundColor: '#DBEAFE' }]}>
+          <Text style={[styles.statValue, { color: '#1D4ED8' }]}>
+            {statsLoading ? '...' : stats?.imagesCount || 0}
+          </Text>
+          <Text style={styles.statLabel}>Images</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: '#D1FAE5' }]}>
+          <Text style={[styles.statValue, { color: '#059669' }]}>
+            {statsLoading ? '...' : stats?.videosCount || 0}
+          </Text>
+          <Text style={styles.statLabel}>Videos</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: '#FED7AA' }]}>
+          <Text style={[styles.statValue, { color: '#EA580C' }]}>
+            {statsLoading ? '...' : stats?.issuesCount || 0}
+          </Text>
+          <Text style={styles.statLabel}>Issues</Text>
         </View>
       </View>
 
@@ -203,7 +226,7 @@ const DashboardScreen = () => {
 
       {/* Recent Activity */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
+        <Text style={[styles.sectionTitle, { marginTop: 8, }]}>Recent Activity</Text>
         {mediaLoading ? (
           <View style={styles.loadingContainer}>
             {[1, 2, 3].map((i) => (
@@ -220,7 +243,7 @@ const DashboardScreen = () => {
           <View style={styles.recentList}>
             {recentMedia.map((media) => {
               const issue = getIssueType(media);
-              
+
               return (
                 <TouchableOpacity
                   key={media.id}
@@ -228,10 +251,10 @@ const DashboardScreen = () => {
                   onPress={() => navigation.navigate('MediaDetail', { id: media.id })}
                 >
                   <View style={styles.recentImage}>
-                    <Ionicons 
-                      name={media.type === 'video' ? 'videocam' : 'image'} 
-                      size={24} 
-                      color="#6B7280" 
+                    <Ionicons
+                      name={media.type === 'video' ? 'videocam' : 'image'}
+                      size={24}
+                      color="#6B7280"
                     />
                   </View>
                   <View style={styles.recentContent}>
@@ -270,13 +293,13 @@ const DashboardScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
   statusBar: {
-    backgroundColor: '#1D4ED8',
+    backgroundColor: colors.primary.DEFAULT,
     paddingHorizontal: 16,
     paddingVertical: 12,
     flexDirection: 'row',
@@ -292,9 +315,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  profileButton: {
+    padding: 4,
+  },
   statusText: {
     color: 'white',
     fontSize: 14,
+    fontFamily:'Montserrat-Regular',
     marginLeft: 8,
     flex: 1,
   },
@@ -306,49 +333,53 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     backgroundColor: 'white',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
   title: {
     fontSize: 24,
-    fontWeight: '600',
+    fontFamily:'Montserrat-Semibold',
     color: '#111827',
   },
   subtitle: {
     fontSize: 14,
     color: '#6B7280',
     marginTop: 4,
+    fontFamily: 'Montserrat-Regular',
   },
   statsGrid: {
     flexDirection: 'row',
-    marginTop: 16,
+    padding: 16,
     justifyContent: 'space-between',
   },
   statCard: {
-    flex: 1,
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
     marginHorizontal: 4,
+    width: (width - 48) / 3,
   },
   statValue: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 22,
+    fontFamily:'Montserrat-Semibold',
   },
   statLabel: {
     fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
+    fontFamily:'Montserrat-Regular',
   },
   section: {
-    padding: 16,
+    paddingHorizontal: 16,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
+    fontFamily:'Montserrat-Bold',
+    color: colors.foreground,
     marginBottom: 16,
   },
   actionsGrid: {
@@ -357,7 +388,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   actionCard: {
-    backgroundColor: 'white',
+    backgroundColor: colors.background,
     width: (width - 48) / 2,
     padding: 16,
     borderRadius: 8,
@@ -374,7 +405,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily:'Montserrat-Medium',
     color: '#111827',
     marginTop: 8,
   },
@@ -436,12 +467,13 @@ const styles = StyleSheet.create({
   },
   recentTitle: {
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily:'Montserrat-Medium',
     color: '#111827',
   },
   recentTime: {
     fontSize: 12,
     color: '#6B7280',
+    fontFamily:'Montserrat-Regular',
     marginTop: 2,
   },
   recentTags: {
@@ -465,7 +497,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily:'Montserrat-Medium',
     color: '#6B7280',
     marginTop: 16,
   },
@@ -473,6 +505,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9CA3AF',
     marginTop: 4,
+    fontFamily:'Montserrat-Regular',
   },
 });
 

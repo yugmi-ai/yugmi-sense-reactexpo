@@ -4,7 +4,7 @@
     "slug": "yugmi-inspector",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/yugmi.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "splash": {
@@ -22,7 +22,8 @@
         "NSMicrophoneUsageDescription": "This app uses the microphone for recording inspection videos.",
         "NSLocationWhenInUseUsageDescription": "This app uses location to geotag inspection media.",
         "NSPhotoLibraryUsageDescription": "This app saves inspection photos and videos to your photo library."
-      }
+      },
+      "bundleIdentifier": "n"
     },
     "android": {
       "adaptiveIcon": {
@@ -36,7 +37,8 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_EXTERNAL_STORAGE"
-      ]
+      ],
+      "package": "com.yugmi.yugmiinspector"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -45,6 +47,11 @@
       "expo-camera",
       "expo-location",
       "expo-media-library"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5b074246-8372-47b2-a811-a41fff81e9a7"
+      }
+    }
   }
 }
