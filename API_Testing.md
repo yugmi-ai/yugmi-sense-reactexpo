@@ -2,6 +2,7 @@
 
 ## Prerequisites
 - Backend server running on `http://localhost:3000`
+- Production Backend server running on `https://yugmi-backend-service.onrender.com`
 - PostgreSQL database connected
 - AWS S3 configured (for file uploads)
 - OpenAI or Gemini API key configured
