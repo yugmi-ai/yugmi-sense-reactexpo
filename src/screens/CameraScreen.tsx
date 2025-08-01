@@ -14,7 +14,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { saveToLibrary } from '../lib/mediaLibrary';
+import * as FileSystem from 'expo-file-system';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, queryKeys } from '../lib/api';
 import { useAuth } from '../lib/authContext';
@@ -29,7 +29,7 @@ const CameraScreen = () => {
   const queryClient = useQueryClient();
   const cameraRef = useRef<CameraView>(null);
   const { user } = useAuth();
-  
+
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('back');
   const [flashMode, setFlashMode] = useState<'on' | 'off'>('off');
@@ -38,13 +38,27 @@ const CameraScreen = () => {
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [address, setAddress] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
 
   // Get mode from route params (photo or video)
   const mode = (route.params as any)?.mode || 'photo';
 
   useEffect(() => {
     getCurrentLocation();
+    initializeAppDirectories();
   }, []);
+
+  // Camera activation effect - helps with black screen issue
+  useEffect(() => {
+    if (permission?.granted) {
+      // Small delay to ensure camera is properly initialized
+      const timer = setTimeout(() => {
+        setIsCameraActive(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [permission?.granted]);
 
   // Recording timer
   useEffect(() => {
@@ -58,6 +72,26 @@ const CameraScreen = () => {
     }
     return () => clearInterval(interval);
   }, [isRecording]);
+
+  const initializeAppDirectories = async () => {
+    try {
+      const photosDir = `${FileSystem.documentDirectory}photos/`;
+      const videosDir = `${FileSystem.documentDirectory}videos/`;
+
+      // Create directories if they don't exist
+      const photosInfo = await FileSystem.getInfoAsync(photosDir);
+      if (!photosInfo.exists) {
+        await FileSystem.makeDirectoryAsync(photosDir, { intermediates: true });
+      }
+
+      const videosInfo = await FileSystem.getInfoAsync(videosDir);
+      if (!videosInfo.exists) {
+        await FileSystem.makeDirectoryAsync(videosDir, { intermediates: true });
+      }
+    } catch (error) {
+      console.error('Error creating app directories:', error);
+    }
+  };
 
   const getCurrentLocation = async () => {
     try {
@@ -84,6 +118,28 @@ const CameraScreen = () => {
     }
   };
 
+  const saveToAppStorage = async (sourceUri: string, isVideo: boolean = false) => {
+    try {
+      const timestamp = Date.now();
+      const fileExtension = isVideo ? 'mp4' : 'jpg';
+      const fileName = `${isVideo ? 'video' : 'photo'}_${timestamp}.${fileExtension}`;
+      const directory = isVideo ? 'videos' : 'photos';
+      const destinationUri = `${FileSystem.documentDirectory}${directory}/${fileName}`;
+
+      // Copy file to app storage
+      await FileSystem.copyAsync({
+        from: sourceUri,
+        to: destinationUri,
+      });
+
+      console.log(`File saved to app storage: ${destinationUri}`);
+      return destinationUri;
+    } catch (error) {
+      console.error('Error saving to app storage:', error);
+      throw error;
+    }
+  };
+
   const uploadMutation = useMutation({
     mutationFn: (data: { file: any; latitude?: number; longitude?: number; locationAddress?: string }) =>
       apiClient.uploadMedia(data),
@@ -93,7 +149,7 @@ const CameraScreen = () => {
       setIsUploading(false);
       Alert.alert(
         'Success',
-        `${mode === 'photo' ? 'Photo' : 'Video'} uploaded successfully`,
+        `${mode === 'photo' ? 'Photo' : 'Video'} saved and uploaded successfully`,
         [
           {
             text: 'OK',
@@ -107,46 +163,27 @@ const CameraScreen = () => {
       console.error('Upload error:', error);
       Alert.alert(
         'Upload Failed',
-        'Failed to upload media. Please try again.',
+        `${mode === 'photo' ? 'Photo' : 'Video'} saved locally but upload failed. You can retry from Gallery.`,
         [{ text: 'OK' }]
       );
     },
   });
 
   const takePicture = async () => {
-    if (cameraRef.current && !isUploading) {
+    if (cameraRef.current && cameraReady && isCameraActive) {
       try {
-        setIsUploading(true);
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.8,
         });
 
         if (!photo) {
-          setIsUploading(false);
           Alert.alert('Error', 'Failed to capture photo');
           return;
         }
 
-        // Try to save to device gallery (with proper error handling)
-        await saveToLibrary(photo.uri);
-
-        // Create file object for upload
-        const fileData = {
-          uri: photo.uri,
-          type: 'image/jpeg',
-          name: `photo_${Date.now()}.jpg`,
-        };
-
-        uploadMutation.mutate({
-          file: fileData as any,
-          latitude: location?.coords.latitude,
-          longitude: location?.coords.longitude,
-          locationAddress: address,
-          locationName: address.split(' ')[0] || 'Unknown',
-          userId: user?.id
-        });
+        await saveToAppStorage(photo.uri, false);
+        navigation.navigate('Gallery');
       } catch (error) {
-        setIsUploading(false);
         console.error('Error taking picture:', error);
         Alert.alert('Error', 'Failed to take picture. Please try again.');
       }
@@ -154,49 +191,28 @@ const CameraScreen = () => {
   };
 
   const recordVideo = async () => {
-    if (cameraRef.current) {
+    if (cameraRef.current && cameraReady && isCameraActive) {
       try {
         if (isRecording) {
-          // Stop recording
           cameraRef.current.stopRecording();
         } else {
-          // Start recording
           setIsRecording(true);
           const video = await cameraRef.current.recordAsync({
-            maxDuration: 60, // 60 seconds max
+            maxDuration: 60,
           });
 
           setIsRecording(false);
-          
+
           if (!video) {
             Alert.alert('Error', 'Failed to record video');
             return;
           }
-          
-          setIsUploading(true);
 
-          // Try to save to device gallery (with proper error handling)
-          await saveToLibrary(video.uri);
-
-          // Create file object for upload
-          const fileData = {
-            uri: video.uri,
-            type: 'video/mp4',
-            name: `video_${Date.now()}.mp4`,
-          };
-
-          uploadMutation.mutate({
-            file: fileData as any,
-            latitude: location?.coords.latitude,
-            longitude: location?.coords.longitude,
-            locationAddress: address,
-            locationName: address.split(' ')[0] || 'Unknown',
-            userId: user?.id
-          });
+          await saveToAppStorage(video.uri, true);
+          navigation.navigate('Gallery');
         }
       } catch (error) {
         setIsRecording(false);
-        setIsUploading(false);
         console.error('Error recording video:', error);
         Alert.alert('Error', 'Failed to record video. Please try again.');
       }
@@ -204,15 +220,40 @@ const CameraScreen = () => {
   };
 
   const toggleCameraType = () => {
-    setCameraFacing(current => 
+    setCameraFacing(current =>
       current === 'back' ? 'front' : 'back'
     );
   };
 
   const toggleFlash = () => {
-    setFlashMode(current => 
+    setFlashMode(current =>
       current === 'off' ? 'on' : 'off'
     );
+  };
+
+  const handleClose = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Gallery');
+    }
+  };
+
+  const onCameraReady = () => {
+    console.log('Camera is ready');
+    setCameraReady(true);
+  };
+
+  const onCameraError = (error: any) => {
+    console.error('Camera error:', error);
+    setCameraReady(false);
+    setIsCameraActive(false);
+
+    // Retry camera initialization after a short delay
+    setTimeout(() => {
+      console.log('Retrying camera initialization...');
+      setIsCameraActive(true);
+    }, 1000);
   };
 
   const formatRecordingTime = (seconds: number) => {
@@ -248,121 +289,143 @@ const CameraScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar hidden />
-      
-      <CameraView
-        ref={cameraRef}
-        style={styles.camera}
-        facing={cameraFacing}
-        flash={flashMode}
-        mode="picture"
-      >
-        <View style={styles.overlay}>
-          {/* Top Controls */}
-          <View style={styles.topControls}>
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Ionicons name="close" size={24} color="white" />
-            </TouchableOpacity>
-            
-            <View style={styles.topCenter}>
-              <Text style={styles.modeText}>
-                {mode === 'photo' ? 'PHOTO' : 'VIDEO'}
-              </Text>
-              {isRecording && (
-                <Text style={styles.recordingTime}>
-                  {formatRecordingTime(recordingTime)}
-                </Text>
-              )}
-            </View>
 
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={toggleFlash}
-            >
-              <Ionicons 
-                name={flashMode === 'on' ? "flash" : "flash-off"} 
-                size={24} 
-                color="white" 
-              />
-            </TouchableOpacity>
+      {/* Camera View - Only render when permissions granted and camera is active */}
+      {isCameraActive && (
+        <CameraView
+          ref={cameraRef}
+          style={styles.camera}
+          facing={cameraFacing}
+          flash={flashMode}
+          mode={mode === 'photo' ? 'picture' : 'video'}
+          onCameraReady={onCameraReady}
+          onMountError={onCameraError}
+        />
+      )}
+
+      {/* Loading indicator when camera is not ready */}
+      {(!cameraReady || !isCameraActive) && (
+        <View style={styles.cameraLoadingOverlay}>
+          <Ionicons name="camera-outline" size={48} color="white" />
+          <Text style={styles.cameraLoadingText}>
+            {!isCameraActive ? 'Starting Camera...' : 'Initializing Camera...'}
+          </Text>
+        </View>
+      )}
+
+      {/* Overlay positioned absolutely on top */}
+      <View style={styles.overlay}>
+        {/* Top Controls */}
+        <View style={styles.topControls}>
+          <TouchableOpacity
+            style={styles.controlButton}
+            onPress={handleClose}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={24} color="white" />
+          </TouchableOpacity>
+
+          <View style={styles.topCenter}>
+            <Text style={styles.modeText}>
+              {mode === 'photo' ? 'PHOTO' : 'VIDEO'}
+            </Text>
+            {isRecording && (
+              <Text style={styles.recordingTime}>
+                {formatRecordingTime(recordingTime)}
+              </Text>
+            )}
           </View>
 
-          {/* Grid Overlay */}
+          <TouchableOpacity
+            style={styles.controlButton}
+            onPress={toggleFlash}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={flashMode === 'on' ? "flash" : "flash-off"}
+              size={24}
+              color="white"
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Grid Overlay - Only show when camera is ready */}
+        {cameraReady && isCameraActive && (
           <View style={styles.gridContainer}>
             <View style={styles.gridLine} />
             <View style={[styles.gridLine, { left: '66.66%' }]} />
             <View style={[styles.gridLine, { top: '33.33%' }, styles.gridLineHorizontal]} />
             <View style={[styles.gridLine, { top: '66.66%' }, styles.gridLineHorizontal]} />
           </View>
+        )}
 
-          {/* Bottom Controls */}
-          <View style={styles.bottomControls}>
-            {/* Mode Selector */}
-            <View style={styles.modeSelector}>
-              <TouchableOpacity
-                style={[styles.modeButton, mode === 'photo' && styles.modeButtonActive]}
-                onPress={() => navigation.setParams({ mode: 'photo' } as any)}
-              >
-                <Text style={[styles.modeButtonText, mode === 'photo' && styles.modeButtonTextActive]}>
-                  Photo
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modeButton, mode === 'video' && styles.modeButtonActive]}
-                onPress={() => navigation.setParams({ mode: 'video' } as any)}
-              >
-                <Text style={[styles.modeButtonText, mode === 'video' && styles.modeButtonTextActive]}>
-                  Video
-                </Text>
-              </TouchableOpacity>
-            </View>
+        {/* Bottom Controls */}
+        <View style={styles.bottomControls}>
+          {/* Mode Selector */}
+          <View style={styles.modeSelector}>
+            <TouchableOpacity
+              style={[styles.modeButton, mode === 'photo' && styles.modeButtonActive]}
+              onPress={() => navigation.setParams({ mode: 'photo' } as any)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.modeButtonText, mode === 'photo' && styles.modeButtonTextActive]}>
+                Photo
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeButton, mode === 'video' && styles.modeButtonActive]}
+              onPress={() => navigation.setParams({ mode: 'video' } as any)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.modeButtonText, mode === 'video' && styles.modeButtonTextActive]}>
+                Video
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-            {/* Capture Controls */}
-            <View style={styles.captureControls}>
-              {/* Gallery Button */}
-              <TouchableOpacity
-                style={styles.galleryButton}
-                onPress={() => navigation.navigate('Gallery')}
-              >
-                <Ionicons name="images" size={24} color="white" />
-              </TouchableOpacity>
+          {/* Capture Controls */}
+          <View style={styles.captureControls}>
+            {/* Gallery Button */}
+            <TouchableOpacity
+              style={styles.galleryButton}
+              onPress={() => navigation.navigate('Gallery')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="images" size={24} color="white" />
+            </TouchableOpacity>
 
-              {/* Capture Button */}
-              <TouchableOpacity
-                style={[
-                  styles.captureButton,
-                  isRecording && styles.captureButtonRecording,
-                  isUploading && styles.captureButtonUploading,
-                ]}
-                onPress={mode === 'photo' ? takePicture : recordVideo}
-                disabled={isUploading}
-              >
-                {isUploading ? (
-                  <View style={styles.captureButtonInner}>
-                    <Ionicons name="hourglass" size={24} color="white" />
-                  </View>
-                ) : isRecording ? (
-                  <View style={styles.captureButtonInner}>
-                    <View style={styles.stopIcon} />
-                  </View>
-                ) : (
-                  <View style={styles.captureButtonInner} />
-                )}
-              </TouchableOpacity>
+            {/* Capture Button */}
+            <TouchableOpacity
+              style={[
+                styles.captureButton,
+                isRecording && styles.captureButtonRecording,
+                isUploading && styles.captureButtonUploading,
+              ]}
+              onPress={mode === 'photo' ? takePicture : recordVideo}
+              disabled={isUploading || !cameraReady || !isCameraActive}
+              activeOpacity={0.8}
+            >
+              {isRecording ? (
+                <View style={styles.captureButtonInner}>
+                  <View style={styles.stopIcon} />
+                </View>
+              ) : (
+                <View style={styles.captureButtonInner} />
+              )}
+            </TouchableOpacity>
 
-              {/* Flip Camera Button */}
-              <TouchableOpacity
-                style={styles.flipButton}
-                onPress={toggleCameraType}
-              >
-                <Ionicons name="camera-reverse" size={24} color="white" />
-              </TouchableOpacity>
-            </View>
+            {/* Flip Camera Button */}
+            <TouchableOpacity
+              style={styles.flipButton}
+              onPress={toggleCameraType}
+              activeOpacity={0.7}
+              disabled={!cameraReady || !isCameraActive}
+            >
+              <Ionicons name="camera-reverse" size={24} color="white" />
+            </TouchableOpacity>
           </View>
         </View>
-      </CameraView>
+      </View>
     </View>
   );
 };
@@ -415,8 +478,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'transparent',
+    pointerEvents: 'box-none',
   },
   topControls: {
     flexDirection: 'row',
@@ -424,9 +492,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 50,
     paddingHorizontal: 20,
+    pointerEvents: 'box-none',
   },
   topCenter: {
     alignItems: 'center',
+    pointerEvents: 'none',
   },
   modeText: {
     color: 'white',
@@ -446,6 +516,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    pointerEvents: 'auto',
   },
   gridContainer: {
     position: 'absolute',
@@ -454,6 +525,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     opacity: 0.3,
+    pointerEvents: 'none',
   },
   gridLine: {
     position: 'absolute',
@@ -473,11 +545,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingBottom: 40,
+    pointerEvents: 'box-none',
   },
   modeSelector: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginBottom: 30,
+    pointerEvents: 'box-none',
   },
   modeButton: {
     paddingHorizontal: 16,
@@ -485,6 +559,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     borderRadius: 16,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    pointerEvents: 'auto',
   },
   modeButtonActive: {
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
@@ -502,6 +577,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 40,
+    pointerEvents: 'box-none',
   },
   galleryButton: {
     width: 48,
@@ -510,6 +586,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    pointerEvents: 'auto',
   },
   captureButton: {
     width: 80,
@@ -518,6 +595,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
+    pointerEvents: 'auto',
   },
   captureButtonRecording: {
     backgroundColor: '#EF4444',
@@ -544,6 +622,48 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    pointerEvents: 'auto',
+  },
+  cameraLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  cameraLoadingText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 12,
+  },
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+  },
+  uploadingContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingHorizontal: 32,
+    paddingVertical: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  uploadingText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 12,
   },
 });
 

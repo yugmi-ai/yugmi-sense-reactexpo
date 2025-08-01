@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -12,15 +12,23 @@ import {
     ActivityIndicator,
     SafeAreaView,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../lib/authContext';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { db, auth } from '../lib/firebase';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ThemeColors, useTheme } from '@crossbuildui/core';
 
 const ProfileScreen = () => {
     const navigation = useNavigation();
+    const insets = useSafeAreaInsets();
+    const { colors } = useTheme();
+    const isMountedRef = useRef(true);
+
+    const styles = getStyles(colors);
+
     const { user, logout } = useAuth();
 
     const [fullName, setFullName] = useState(user?.fullName || '');
@@ -29,31 +37,56 @@ const ProfileScreen = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    useEffect(() => {
-        const loadUserData = async () => {
-            if (!user) return;
-            setIsLoading(true);
-            try {
-                const userDoc = await getDoc(doc(db, 'users', auth.currentUser?.uid || ''));
-                if (userDoc.exists()) {
-                    const userData = userDoc.data();
-                    setFullName(userData.fullName || '');
-                    setUsername(userData.username || '');
-                }
-            } catch (error) {
-                console.error('Error loading user data:', error);
-                Alert.alert('Error', 'Failed to load profile data');
-            } finally {
-                setIsLoading(false);
-            }
-        };
+    // Safe state setter that checks if component is still mounted
+    const safeSetState = useCallback((setter: Function, value: any) => {
+        if (isMountedRef.current) {
+            setter(value);
+        }
+    }, []);
 
-        loadUserData();
-    }, [user]);
+    // Track component mount status
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
+
+    // Use useFocusEffect instead of useEffect to ensure proper cleanup
+    useFocusEffect(
+        useCallback(() => {
+            const loadUserData = async () => {
+                if (!user || !isMountedRef.current) return;
+
+                safeSetState(setIsLoading, true);
+
+                try {
+                    const userDoc = await getDoc(doc(db, 'users', auth.currentUser?.uid || ''));
+
+                    if (userDoc.exists() && isMountedRef.current) {
+                        const userData = userDoc.data();
+                        safeSetState(setFullName, userData.fullName || '');
+                        safeSetState(setUsername, userData.username || '');
+                    }
+                } catch (error) {
+                    console.error('Error loading user data:', error);
+                    if (isMountedRef.current) {
+                        Alert.alert('Error', 'Failed to load profile data');
+                    }
+                } finally {
+                    safeSetState(setIsLoading, false);
+                }
+            };
+
+            loadUserData();
+        }, [user, safeSetState])
+    );
 
     const handleSaveProfile = async () => {
-        if (!user || !auth.currentUser) return;
-        setIsSaving(true);
+        if (!user || !auth.currentUser || !isMountedRef.current) return;
+
+        safeSetState(setIsSaving, true);
+
         try {
             await updateDoc(doc(db, 'users', auth.currentUser.uid), {
                 fullName,
@@ -65,22 +98,30 @@ const ProfileScreen = () => {
                 displayName: fullName,
             });
 
-            setIsEditing(false);
-            Alert.alert('Success', 'Profile updated successfully');
+            if (isMountedRef.current) {
+                safeSetState(setIsEditing, false);
+                Alert.alert('Success', 'Profile updated successfully');
+            }
         } catch (error) {
             console.error('Error updating profile:', error);
-            Alert.alert('Error', 'Failed to update profile');
+            if (isMountedRef.current) {
+                Alert.alert('Error', 'Failed to update profile');
+            }
         } finally {
-            setIsSaving(false);
+            safeSetState(setIsSaving, false);
         }
     };
 
     const handleLogout = async () => {
         try {
+            // Set a flag to prevent state updates during logout
+            isMountedRef.current = false;
             await logout();
         } catch (error) {
             console.error('Logout error:', error);
-            Alert.alert('Error', 'Failed to logout');
+            if (isMountedRef.current) {
+                Alert.alert('Error', 'Failed to logout');
+            }
         }
     };
 
@@ -95,7 +136,8 @@ const ProfileScreen = () => {
         );
     };
 
-    if (isLoading) {
+    // Early return with loading if component is not mounted or loading
+    if (!isMountedRef.current || isLoading) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#1D4ED8" />
@@ -104,45 +146,29 @@ const ProfileScreen = () => {
     }
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+        <View
+            style={[styles.container, { paddingTop: insets.top }]}
         >
-            <SafeAreaView style={styles.safeHeader}>
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => navigation.goBack()}
-                    >
-                        <Ionicons name="arrow-back" size={24} color="#1D4ED8" />
-                    </TouchableOpacity>
+            <View style={styles.header}>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => {
+                        // Prevent navigation if component is unmounting
+                        if (isMountedRef.current) {
+                            navigation.goBack();
+                        }
+                    }}
+                >
+                    <Ionicons name="arrow-back" size={24} color="#1D4ED8" />
+                </TouchableOpacity>
 
-                    <Text style={styles.title}>Profile</Text>
+                <Text style={styles.title}>Profile</Text>
+            </View>
 
-                    <TouchableOpacity
-                        style={styles.editButton}
-                        onPress={() => (isEditing ? handleSaveProfile() : setIsEditing(true))}
-                        disabled={isSaving}
-                    >
-                        {isSaving ? (
-                            <ActivityIndicator size="small" color="#1D4ED8" />
-                        ) : (
-                            <Text style={styles.editButtonText}>{isEditing ? 'Save' : 'Edit'}</Text>
-                        )}
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
-
-            <ScrollView contentContainerStyle={styles.scrollContainer}>
-                <View style={styles.profileImageContainer}>
-                    <View style={styles.profileImage}>
-                        <Text style={styles.profileInitial}>
-                            {fullName ? fullName.charAt(0).toUpperCase() : 'U'}
-                        </Text>
-                    </View>
-                </View>
-
+            <ScrollView
+                contentContainerStyle={styles.scrollContainer}
+                keyboardShouldPersistTaps="handled"
+            >
                 <View style={styles.formContainer}>
                     <View style={styles.formGroup}>
                         <Text style={styles.label}>Email</Text>
@@ -163,7 +189,11 @@ const ProfileScreen = () => {
                             <TextInput
                                 style={styles.input}
                                 value={fullName}
-                                onChangeText={setFullName}
+                                onChangeText={(text) => {
+                                    if (isMountedRef.current) {
+                                        setFullName(text);
+                                    }
+                                }}
                                 editable={isEditing}
                                 placeholder="Enter your full name"
                             />
@@ -177,27 +207,35 @@ const ProfileScreen = () => {
                             <TextInput
                                 style={styles.input}
                                 value={username}
-                                onChangeText={setUsername}
+                                onChangeText={(text) => {
+                                    if (isMountedRef.current) {
+                                        setUsername(text);
+                                    }
+                                }}
                                 editable={isEditing}
                                 placeholder="Enter your username"
                             />
                         </View>
                     </View>
 
-                    <TouchableOpacity style={styles.logoutButton} onPress={confirmLogout}>
+                    <TouchableOpacity
+                        style={styles.logoutButton}
+                        onPress={confirmLogout}
+                        disabled={isSaving}
+                    >
                         <Ionicons name="log-out-outline" size={20} color="white" style={styles.logoutIcon} />
                         <Text style={styles.logoutText}>Logout</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
-        </KeyboardAvoidingView>
+        </View>
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: colors.background,
     },
     scrollContainer: {
         flexGrow: 1,
@@ -207,36 +245,19 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    safeHeader: {
-        backgroundColor: '#FFFFFF',
-        paddingTop: Platform.OS === 'ios' ? 48 : 16,
+        backgroundColor: colors.background,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 30,
-        paddingBottom: 12,
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        marginTop: 30,
-        marginBottom: 40,
+        justifyContent: 'flex-start',
+        paddingHorizontal: 16,
+        gap: 16,
     },
     title: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        textAlign: 'center',
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#111827',
+        fontSize: 22,
+        fontFamily: 'Montserrat-Bold',
+        color: colors.foreground,
     },
     backButton: {
         width: 40,
@@ -259,7 +280,7 @@ const styles = StyleSheet.create({
     },
     profileImageContainer: {
         alignItems: 'center',
-        marginVertical: 24,
+        marginVertical: 16,
     },
     profileImage: {
         width: 100,
@@ -279,11 +300,6 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         marginHorizontal: 16,
         padding: 24,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
     },
     formGroup: {
         marginBottom: 20,

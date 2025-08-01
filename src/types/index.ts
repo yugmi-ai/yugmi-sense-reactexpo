@@ -42,7 +42,9 @@ export interface MediaItem {
   mimeType: string;
   size: number;
   type: 'image' | 'video';
+  uri?: string;
   latitude?: number;
+  isLocal?: boolean;
   longitude?: number;
   locationName?: string;
   locationAddress?: string;
@@ -165,3 +167,12 @@ export interface ApiError {
   code?: string;
   statusCode?: number;
 }
+
+// Local media types
+export type LocalMedia = {
+  id: string;
+  type: 'image' | 'video';
+  uri: string;
+  isLocal: true;
+  createdAt: string;
+};

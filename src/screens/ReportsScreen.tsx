@@ -16,11 +16,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient, queryKeys } from '../lib/api';
 import { Report } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as FileSystem from 'expo-file-system';
+import * as VideoThumbnails from 'expo-video-thumbnails';
+import { ThemeColors, useTheme } from '@crossbuildui/core';
 
 const ReportsScreen = () => {
+  const insets = useSafeAreaInsets();
+
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
+
   const navigation = useNavigation();
   const queryClient = useQueryClient();
-  
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newReport, setNewReport] = useState({
     title: '',
@@ -64,9 +73,9 @@ const ReportsScreen = () => {
 
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'short', 
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -140,13 +149,13 @@ const ReportsScreen = () => {
           </Text>
         </View>
       </View>
-      
+
       <View style={styles.reportMeta}>
         <View style={styles.metaItem}>
           <Ionicons name="calendar-outline" size={14} color="#6B7280" />
           <Text style={styles.metaText}>{formatDate(item.createdAt)}</Text>
         </View>
-        
+
         {item.content && (
           <View style={styles.metaItem}>
             <Ionicons name="images-outline" size={14} color="#6B7280" />
@@ -155,7 +164,7 @@ const ReportsScreen = () => {
             </Text>
           </View>
         )}
-        
+
         {item.content && item.content.issues && item.content.issues.length > 0 && (
           <View style={styles.metaItem}>
             <Ionicons name="warning-outline" size={14} color="#EA580C" />
@@ -210,7 +219,7 @@ const ReportsScreen = () => {
             </Text>
           </TouchableOpacity>
         </View>
-        
+
         <View style={styles.modalContent}>
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Report Title *</Text>
@@ -221,7 +230,7 @@ const ReportsScreen = () => {
               onChangeText={(text) => setNewReport(prev => ({ ...prev, title: text }))}
             />
           </View>
-          
+
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Report Type</Text>
             <View style={styles.typeButtons}>
@@ -244,10 +253,10 @@ const ReportsScreen = () => {
               ))}
             </View>
           </View>
-          
+
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Include</Text>
-            
+
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>Images and Videos</Text>
               <Switch
@@ -257,7 +266,7 @@ const ReportsScreen = () => {
                 thumbColor={newReport.includeImages ? '#1D4ED8' : '#9CA3AF'}
               />
             </View>
-            
+
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>Detected Issues</Text>
               <Switch
@@ -267,7 +276,7 @@ const ReportsScreen = () => {
                 thumbColor={newReport.includeIssues ? '#1D4ED8' : '#9CA3AF'}
               />
             </View>
-            
+
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>Location Data</Text>
               <Switch
@@ -284,7 +293,7 @@ const ReportsScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Reports</Text>
@@ -334,24 +343,21 @@ const ReportsScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 16,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#111827',
+    fontSize: 22,
+    fontFamily: 'Montserrat-Bold',
+    color: colors.foreground,
   },
   headerButton: {
     padding: 8,
@@ -379,12 +385,13 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1D4ED8',
+    fontSize: 22,
+    fontFamily: 'Montserrat-Semibold',
+    color: colors.primary.DEFAULT,
   },
   statLabel: {
     fontSize: 12,
+    fontFamily: 'Montserrat-Semibold',
     color: '#6B7280',
     marginTop: 4,
   },
