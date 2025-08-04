@@ -1,0 +1,36 @@
+name: Auto Sync Main to Other Branches
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync-branches:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Needed to push changes to the repo
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch all branches
+        run: git fetch --all
+
+      - name: Merge main into backend-branch
+        run: |
+          git checkout backend-branch
+          git merge origin/main --no-edit || echo "No changes to merge"
+          git push origin backend-branch
+
+      - name: Merge main into AI-agentic-branch
+        run: |
+          git checkout AI-agentic-branch
+          git merge origin/main --no-edit || echo "No changes to merge"
+          git push origin AI-agentic-branch
