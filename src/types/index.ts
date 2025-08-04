@@ -1,8 +1,5 @@
-// Types for YugmiInspector React Native App
-
-// Base types
 export interface User {
-  id: string; // Changed from number to string
+  id: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -14,9 +11,9 @@ export interface User {
 }
 
 export interface Organization {
-  id: string;
-  name: string;
-  email: string;
+    id: string;
+    name: string;
+    email: string;
 }
 
 // Authentication types
@@ -25,16 +22,37 @@ export interface AuthCredentials {
   password: string;
 }
 
-export interface SignupData {
+// --- Updated SignupData ---
+export interface OrganizationData {
+  name: string;
   email: string;
-  password: string;
-  fullName: string;
+  phone: string;
+  address: string;
 }
 
+interface BaseSignupData {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}
+
+interface IndividualSignupData extends BaseSignupData {
+  userType: 'individual';
+}
+
+interface OrganizationSignupData extends BaseSignupData {
+  userType: 'organization';
+  organizationData: OrganizationData;
+}
+
+export type SignupData = IndividualSignupData | OrganizationSignupData;
+
+
 export interface AuthResponseData {
-  user: User;
-  organization: Organization | null;
-  token: string;
+    user: User;
+    organization: Organization | null;
+    token: string;
 }
 
 export interface AuthResponse {

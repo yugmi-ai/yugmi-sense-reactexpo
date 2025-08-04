@@ -1,47 +1,61 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AuthState, User, AuthCredentials, SignupData, Organization, AuthResponse } from '../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthState, AuthCredentials, SignupData, AuthResponse } from '../types';
 
-// Default auth state
+// Default state represents a logged-out user
 const defaultAuthState: AuthState = {
   user: null,
   organization: null,
   token: null,
   isAuthenticated: false,
-  isLoading: true,
+  isLoading: true, // Start with loading true to check for stored token
 };
 
-// Create context
 interface AuthContextType extends AuthState {
-  login: (credentials: AuthCredentials) => Promise<AuthResponse>;
-  signup: (userData: SignupData) => Promise<AuthResponse>;
+  login: (credentials: AuthCredentials) => Promise<void>;
+  signup: (userData: SignupData) => Promise<void>;
   logout: () => Promise<void>;
-  forgotPassword: (email: string) => Promise<{ message: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [authState, setAuthState] = useState<AuthState>(defaultAuthState);
 
+  // Check for a stored token on app startup
   useEffect(() => {
-    // On app start, you might want to load the token from async storage
-    // and validate it to restore the session.
-    setAuthState({ ...defaultAuthState, isLoading: false });
+    const loadToken = async () => {
+      try {
+        const token = await AsyncStorage.getItem('authToken');
+        const userString = await AsyncStorage.getItem('user');
+        const orgString = await AsyncStorage.getItem('organization');
+
+        if (token && userString) {
+          setAuthState({
+            token,
+            user: JSON.parse(userString),
+            organization: orgString ? JSON.parse(orgString) : null,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        } else {
+          setAuthState({ ...defaultAuthState, isLoading: false });
+        }
+      } catch (e) {
+        // In case of error, ensure user is logged out
+        setAuthState({ ...defaultAuthState, isLoading: false });
+      }
+    };
+
+    loadToken();
   }, []);
 
-  // Updated Login function
-  const login = async (credentials: AuthCredentials): Promise<AuthResponse> => {
+  const login = async (credentials: AuthCredentials): Promise<void> => {
     try {
       const response = await fetch('https://yugmi-backend-service.onrender.com/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: credentials.email,
-          password: credentials.password,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
       });
 
       const data: AuthResponse = await response.json();
@@ -52,108 +66,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const { user, organization, token } = data.data;
 
-      setAuthState({
-        user,
-        organization,
-        token,
-        isAuthenticated: true,
-        isLoading: false,
-      });
+      // Store session
+      await AsyncStorage.setItem('authToken', token);
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+      if (organization) {
+        await AsyncStorage.setItem('organization', JSON.stringify(organization));
+      }
 
-      // You should also save the token to AsyncStorage here to persist login
-      return data;
+      // Set state on success
+      setAuthState({ user, organization, token, isAuthenticated: true, isLoading: false });
+
     } catch (error: any) {
-      console.error('Login error:', error);
+      // **CRITICAL FIX**: On error, explicitly reset state and clear storage
+      await AsyncStorage.clear();
+      setAuthState({ ...defaultAuthState, isLoading: false });
+      // Re-throw error to be caught by the UI component (e.g., to show an alert)
       throw error;
     }
   };
 
-  // Updated Signup function
-  const signup = async (userData: SignupData): Promise<AuthResponse> => {
-    const nameParts = userData.fullName.split(' ');
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(' ');
-
+  const signup = async (userData: SignupData): Promise<void> => {
     try {
       const response = await fetch('https://yugmi-backend-service.onrender.com/api/auth/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: userData.email,
-          password: userData.password,
-          firstName: firstName,
-          lastName: lastName,
-          userType: 'individual', // Assuming individual signup for now
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
       });
 
       const data: AuthResponse = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Failed to create account.');
+        throw new Error(data.message || 'Registration failed.');
       }
 
       const { user, organization, token } = data.data;
 
-      setAuthState({
-        user,
-        organization,
-        token,
-        isAuthenticated: true,
-        isLoading: false,
-      });
-      
-      // You should also save the token to AsyncStorage here to persist login
-      return data;
+      // Store session
+      await AsyncStorage.setItem('authToken', token);
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+      if (organization) {
+        await AsyncStorage.setItem('organization', JSON.stringify(organization));
+      }
+
+      // Set state on success
+      setAuthState({ user, organization, token, isAuthenticated: true, isLoading: false });
+
     } catch (error: any) {
-      console.error('Signup error:', error);
+      // **CRITICAL FIX**: On error, explicitly reset state and clear storage
+      await AsyncStorage.clear();
+      setAuthState({ ...defaultAuthState, isLoading: false });
+      // Re-throw error to be caught by the UI component
       throw error;
     }
   };
 
-  // Logout function
   const logout = async () => {
-    // Clear the auth state and remove the token from AsyncStorage
-    setAuthState({
-        ...defaultAuthState,
-        isLoading: false,
-      });
-  };
-
-  // Forgot password function
-  const forgotPassword = async (email: string) => {
-    // This would be updated to call the new backend's endpoint
-    console.log('Forgot password function needs to be updated for the new API');
-    // Example implementation:
-    // const response = await fetch('https://yugmi-backend-service.onrender.com/api/auth/forgot-password', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ email }),
-    // });
-    // const data = await response.json();
-    // if (!response.ok) throw new Error(data.message);
-    // return data;
-    return Promise.reject('Forgot password not implemented for the new API');
+    // Clear storage and reset state
+    await AsyncStorage.clear();
+    setAuthState({ ...defaultAuthState, isLoading: false });
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        ...authState,
-        login,
-        signup,
-        logout,
-        forgotPassword,
-      }}
-    >
+    <AuthContext.Provider value={{ ...authState, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Custom hook to use the auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

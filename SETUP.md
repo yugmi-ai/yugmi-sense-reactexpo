@@ -8,6 +8,18 @@ Before starting, make sure you have the following installed:
 
 1. **Node.js** (v18 or higher)
 2. **npm** or **yarn**
+3. **Crossbuild UI CLI** (install globally):
+   ```bash
+   npm install -g cbui-cli
+   ```
+4. **Crossbuild UI CLI Login**:
+   ```bash
+   cbui-cli login
+   ```
+4. **Install UI Components**:
+   ```bash
+   cbui-cli install
+   ```
 3. **Expo CLI** (install globally):
    ```bash
    npm install -g @expo/cli

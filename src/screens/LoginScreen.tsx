@@ -15,24 +15,32 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../lib/authContext';
+import { AuthCredentials } from '../types';
 
 const LoginScreen = () => {
   const navigation = useNavigation();
   const { login } = useAuth();
-  
+
+  // State for form inputs
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // State for UI control
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // State for validation errors
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  const validateEmail = (email: string) => {
+  // --- Validation Functions ---
+  const validateEmail = (text: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email) {
+    if (!text) {
       setEmailError('Email is required');
       return false;
-    } else if (!emailRegex.test(email)) {
+    }
+    if (!emailRegex.test(text)) {
       setEmailError('Please enter a valid email address');
       return false;
     }
@@ -40,11 +48,12 @@ const LoginScreen = () => {
     return true;
   };
 
-  const validatePassword = (password: string) => {
-    if (!password) {
+  const validatePassword = (text: string) => {
+    if (!text) {
       setPasswordError('Password is required');
       return false;
-    } else if (password.length < 6) {
+    }
+    if (text.length < 6) {
       setPasswordError('Password must be at least 6 characters');
       return false;
     }
@@ -52,25 +61,25 @@ const LoginScreen = () => {
     return true;
   };
 
+  // --- Login Handler ---
   const handleLogin = async () => {
     const isEmailValid = validateEmail(email);
     const isPasswordValid = validatePassword(password);
 
     if (!isEmailValid || !isPasswordValid) {
-      return;
+      return; // Stop submission if validation fails
     }
 
     setIsLoading(true);
     try {
-      await login({ email, password });
-      // Navigation will be handled by the Firebase auth state change in App.tsx
+      const credentials: AuthCredentials = { email, password };
+      await login(credentials);
+      // On success, the auth state change in the context will handle navigation
     } catch (error: any) {
       console.error('Login error:', error);
-      
-      // Display the error message from Firebase (already formatted in auth context)
       Alert.alert(
         'Login Failed',
-        error.message || 'Failed to login. Please check your credentials and try again.'
+        error.message || 'Invalid credentials. Please try again.'
       );
     } finally {
       setIsLoading(false);
@@ -80,13 +89,13 @@ const LoginScreen = () => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Logo and App Name */}
         <View style={styles.logoContainer}>
           <Image
-            source={require('../../assets/yugmi.png')}
+            source={require('../../assets/yugmi.png')} // Ensure this path is correct
             style={styles.logo}
             resizeMode="contain"
           />
@@ -94,9 +103,11 @@ const LoginScreen = () => {
           <Text style={styles.tagline}>Field Inspection Solution</Text>
         </View>
 
+        {/* Login Form */}
         <View style={styles.formContainer}>
-          <Text style={styles.title}>Login</Text>
-          
+          <Text style={styles.title}>Welcome Back</Text>
+
+          {/* Email Input */}
           <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
             <TextInput
@@ -104,13 +115,14 @@ const LoginScreen = () => {
               placeholder="Email"
               value={email}
               onChangeText={setEmail}
+              onBlur={() => validateEmail(email)}
               keyboardType="email-address"
               autoCapitalize="none"
-              onBlur={() => validateEmail(email)}
             />
           </View>
           {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
+          {/* Password Input */}
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
             <TextInput
@@ -118,18 +130,11 @@ const LoginScreen = () => {
               placeholder="Password"
               value={password}
               onChangeText={setPassword}
-              secureTextEntry={!showPassword}
               onBlur={() => validatePassword(password)}
+              secureTextEntry={!showPassword}
             />
-            <TouchableOpacity
-              style={styles.passwordToggle}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              <Ionicons
-                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={20}
-                color="#6B7280"
-              />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={24} color="#6B7280" />
             </TouchableOpacity>
           </View>
           {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
@@ -141,18 +146,20 @@ const LoginScreen = () => {
             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>
 
+          {/* Login Button */}
           <TouchableOpacity
-            style={[styles.loginButton, (isLoading || !email || !password) && styles.loginButtonDisabled]}
+            style={[styles.loginButton, isLoading && styles.buttonDisabled]}
             onPress={handleLogin}
-            disabled={isLoading || !email || !password}
+            disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color="white" size="small" />
+              <ActivityIndicator color="white" />
             ) : (
               <Text style={styles.loginButtonText}>Login</Text>
             )}
           </TouchableOpacity>
 
+          {/* Link to Signup Screen */}
           <View style={styles.signupContainer}>
             <Text style={styles.signupText}>Don't have an account? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Signup' as never)}>
@@ -165,6 +172,7 @@ const LoginScreen = () => {
   );
 };
 
+// --- Styles (Consistent with SignupScreen) ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -172,53 +180,48 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
+    alignItems: 'center',
     paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingVertical: 40,
+    width: '100%',
+    marginTop: 45,
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 60,
-    marginBottom: 40,
+    marginBottom: 30,
   },
   logo: {
-    width: 100,
-    height: 100,
+    width: 80,
+    height: 80,
     marginBottom: 16,
   },
   appName: {
     fontSize: 28,
-    fontWeight: '700',
     color: '#1D4ED8',
     marginBottom: 8,
+    fontFamily: 'Montserrat-Bold',
   },
   tagline: {
     fontSize: 16,
     color: '#6B7280',
+    fontFamily: 'Montserrat-Regular',
   },
   formContainer: {
-    backgroundColor: 'white',
     borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    width: '100%'
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '600',
     color: '#111827',
+    textAlign: 'center',
     marginBottom: 24,
+    fontFamily: 'Montserrat-Semibold',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
+    backgroundColor: '#F3F4F6',
     borderRadius: 8,
     marginBottom: 8,
     paddingHorizontal: 12,
@@ -233,22 +236,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#111827',
   },
-  passwordToggle: {
-    padding: 8,
-  },
   errorText: {
     color: '#EF4444',
     fontSize: 12,
-    marginBottom: 8,
+    marginBottom: 10,
     marginLeft: 4,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginBottom: 24,
+    marginVertical: 12,
   },
   forgotPasswordText: {
     color: '#1D4ED8',
     fontSize: 14,
+    fontFamily: 'Montserrat-Medium',
   },
   loginButton: {
     backgroundColor: '#1D4ED8',
@@ -256,28 +257,32 @@ const styles = StyleSheet.create({
     height: 50,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 8,
     marginBottom: 24,
   },
-  loginButtonDisabled: {
+  buttonDisabled: {
     backgroundColor: '#93C5FD',
   },
   loginButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Montserrat-Bold',
   },
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   signupText: {
     color: '#6B7280',
     fontSize: 14,
+    fontFamily: 'Montserrat-Regular',
   },
   signupLink: {
     color: '#1D4ED8',
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Montserrat-Bold',
+    marginLeft: 4,
   },
 });
 
