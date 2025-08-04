@@ -16,31 +16,16 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../lib/authContext';
 
-const SignupScreen = () => {
+const LoginScreen = () => {
   const navigation = useNavigation();
-  const { signup } = useAuth();
-  
-  const [fullName, setFullName] = useState('');
+  const { login } = useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
-  const [fullNameError, setFullNameError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [confirmPasswordError, setConfirmPasswordError] = useState('');
-
-  const validateFullName = (name: string) => {
-    if (!name) {
-      setFullNameError('Full name is required');
-      return false;
-    }
-    setFullNameError('');
-    return true;
-  };
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -67,44 +52,25 @@ const SignupScreen = () => {
     return true;
   };
 
-  const validateConfirmPassword = (confirmPassword: string) => {
-    if (!confirmPassword) {
-      setConfirmPasswordError('Please confirm your password');
-      return false;
-    } else if (confirmPassword !== password) {
-      setConfirmPasswordError('Passwords do not match');
-      return false;
-    }
-    setConfirmPasswordError('');
-    return true;
-  };
-
-  const handleSignup = async () => {
-    const isFullNameValid = validateFullName(fullName);
+  const handleLogin = async () => {
     const isEmailValid = validateEmail(email);
     const isPasswordValid = validatePassword(password);
-    const isConfirmPasswordValid = validateConfirmPassword(confirmPassword);
 
-    if (!isFullNameValid || !isEmailValid || !isPasswordValid || !isConfirmPasswordValid) {
+    if (!isEmailValid || !isPasswordValid) {
       return;
     }
 
     setIsLoading(true);
     try {
-      await signup({
-        fullName,
-        email,
-        password,
-        confirmPassword,
-      });
-      // Navigation will be handled by the Firebase auth state change in App.tsx
+      await login({ email, password });
+      // Upon successful login, navigation can be handled by a state change listener
+      // or you can explicitly navigate here.
     } catch (error: any) {
-      console.error('Signup error:', error);
-      
-      // Display the error message from Firebase (already formatted in auth context)
+      console.error('Login error:', error);
+
       Alert.alert(
-        'Signup Failed',
-        error.message || 'Failed to create account. Please try again.'
+        'Login Failed',
+        error.message || 'Failed to login. Please check your credentials and try again.'
       );
     } finally {
       setIsLoading(false);
@@ -129,19 +95,7 @@ const SignupScreen = () => {
         </View>
 
         <View style={styles.formContainer}>
-          <Text style={styles.title}>Create Account</Text>
-          
-          <View style={styles.inputContainer}>
-            <Ionicons name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Full Name"
-              value={fullName}
-              onChangeText={setFullName}
-              onBlur={() => validateFullName(fullName)}
-            />
-          </View>
-          {fullNameError ? <Text style={styles.errorText}>{fullNameError}</Text> : null}
+          <Text style={styles.title}>Login</Text>
 
           <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
@@ -180,48 +134,29 @@ const SignupScreen = () => {
           </View>
           {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
 
-          <View style={styles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry={!showConfirmPassword}
-              onBlur={() => validateConfirmPassword(confirmPassword)}
-            />
-            <TouchableOpacity
-              style={styles.passwordToggle}
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            >
-              <Ionicons
-                name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={20}
-                color="#6B7280"
-              />
-            </TouchableOpacity>
-          </View>
-          {confirmPasswordError ? <Text style={styles.errorText}>{confirmPasswordError}</Text> : null}
+          <TouchableOpacity
+            style={styles.forgotPassword}
+            onPress={() => navigation.navigate('ForgotPassword' as never)}
+          >
+            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.signupButton,
-              (isLoading || !fullName || !email || !password || !confirmPassword) && styles.signupButtonDisabled
-            ]}
-            onPress={handleSignup}
-            disabled={isLoading || !fullName || !email || !password || !confirmPassword}
+            style={[styles.loginButton, (isLoading || !email || !password) && styles.loginButtonDisabled]}
+            onPress={handleLogin}
+            disabled={isLoading || !email || !password}
           >
             {isLoading ? (
               <ActivityIndicator color="white" size="small" />
             ) : (
-              <Text style={styles.signupButtonText}>Create Account</Text>
+              <Text style={styles.loginButtonText}>Login</Text>
             )}
           </TouchableOpacity>
 
-          <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login' as never)}>
-              <Text style={styles.loginLink}>Login</Text>
+          <View style={styles.signupContainer}>
+            <Text style={styles.signupText}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Signup' as never)}>
+              <Text style={styles.signupLink}>Sign Up</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -242,22 +177,22 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 30,
+    marginTop: 60,
+    marginBottom: 40,
   },
   logo: {
-    width: 80,
-    height: 80,
+    width: 100,
+    height: 100,
     marginBottom: 16,
   },
   appName: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
     color: '#1D4ED8',
     marginBottom: 8,
   },
   tagline: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#6B7280',
   },
   formContainer: {
@@ -307,36 +242,43 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginLeft: 4,
   },
-  signupButton: {
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: 24,
+  },
+  forgotPasswordText: {
+    color: '#1D4ED8',
+    fontSize: 14,
+  },
+  loginButton: {
     backgroundColor: '#1D4ED8',
     borderRadius: 8,
     height: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 16,
     marginBottom: 24,
   },
-  signupButtonDisabled: {
+  loginButtonDisabled: {
     backgroundColor: '#93C5FD',
   },
-  signupButtonText: {
+  loginButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
-  loginContainer: {
+  signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
   },
-  loginText: {
+  signupText: {
     color: '#6B7280',
     fontSize: 14,
   },
-  loginLink: {
+  signupLink: {
     color: '#1D4ED8',
     fontSize: 14,
     fontWeight: '600',
   },
 });
 
-export default SignupScreen;
+export default LoginScreen;

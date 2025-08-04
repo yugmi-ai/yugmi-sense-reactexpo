@@ -2,12 +2,21 @@
 
 // Base types
 export interface User {
-  id: number;
-  username: string;
+  id: string; // Changed from number to string
   email: string;
-  fullName?: string;
-  role?: string;
+  firstName: string;
+  lastName: string;
+  userType: 'individual' | 'organization';
+  isActive: boolean;
   createdAt: string;
+  organizationId?: string;
+  roleId?: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  email: string;
 }
 
 // Authentication types
@@ -20,16 +29,24 @@ export interface SignupData {
   email: string;
   password: string;
   fullName: string;
-  confirmPassword: string;
 }
 
-export interface AuthResponse {
+export interface AuthResponseData {
   user: User;
+  organization: Organization | null;
   token: string;
 }
 
+export interface AuthResponse {
+  success: boolean;
+  message: string;
+  data: AuthResponseData;
+}
+
+
 export interface AuthState {
   user: User | null;
+  organization: Organization | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
