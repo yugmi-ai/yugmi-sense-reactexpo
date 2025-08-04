@@ -1,16 +1,14 @@
 {
   "expo": {
-    "name": "YugmiInspector",
+    "name": "Yugmi Inspector",
     "slug": "yugmi-inspector",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/yugmi.png",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1D4ED8"
+      "resizeMode": "contain"
     },
     "assetBundlePatterns": [
       "**/*"
